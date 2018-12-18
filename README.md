@@ -79,6 +79,10 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
   * If v140 then select 8.1 (Note that Windows 8.1 SDK must be installed);
   * If v141 then select 10.0.17134.0 (Note that Windows 10.0.17134 SDK must be installed). 
 
+# Bugs found with ROCALL
+
+Making ReactOS Great Again, http://www.kernelmode.info/forum/viewtopic.php?f=11&t=5302 (Long list and explanation)
+
 # Authors
 
 (c) 2018 ROCALL Project
