@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        05 Dec 2018
+*  DATE:        07 Dec 2018
 *
 *  Program entry point.
 *
@@ -23,53 +23,10 @@
 
 #include "global.h"
 
-//
-// Copy-paste begin.
-//
-
-//
-// Invoke bullshit mantra lvl 80
-//
-//
-//  "There is no ReactOS code in RoCall. There never was. 
-//   There was never such an accusation in the first place."
-//
-
-#define ServiceMacro(name, argcount) (CHAR*)"Nt"##name,
-CHAR *KiServiceTableNames[] = {
-#include "KiServiceTable.h"
-};
-#undef ServiceMacro
-
-#define ServiceMacro(name, argcount) argcount * sizeof(void *), 
-UCHAR KiServiceArgumentTable[] = {
-#include "KiServiceTable.h"
-};
-#undef ServiceMacro
-
-#define ServiceMacro(name, argcount) (CHAR*)"Nt"##name,
-CHAR *W32pServiceTableNames[] = {
-#include "W32pServiceTable.h"
-};
-#undef ServiceMacro
-
-#define ServiceMacro(name, argcount) argcount * sizeof(void *), 
-UCHAR W32pServiceArgumentTable[] = {
-#include "W32pServiceTable.h"
-};
-#undef ServiceMacro
-
-#define NTOS_MIN_SYSCALL_NUMBER    0
-#define NTOS_NUMBER_OF_SYSCALLS    (sizeof(KiServiceArgumentTable) / sizeof(KiServiceArgumentTable[0]))
-#define NTOS_MAX_SYSCALL_NUMBER    (NTOS_NUMBER_OF_SYSCALLS - 1)
-
-#define W32K_MIN_SYSCALL_NUMBER    0x1000
-#define W32K_NUMBER_OF_SYSCALLS    (sizeof(W32pServiceArgumentTable) / sizeof(W32pServiceArgumentTable[0]))
-#define W32K_MAX_SYSCALL_NUMBER    W32K_MIN_SYSCALL_NUMBER + (W32K_NUMBER_OF_SYSCALLS - 1)
-
-//
-// Copy-paste end.
-//
+#define SYSCALL_ENTRY_FIRST 0
+#define W32K_SYSCALL_ADJUST 0x1000
+#define KiServiceLimit      sizeof(KiServiceTable) / sizeof(SYSCALL_ENTRY)
+#define W32pServiceLimit    sizeof(W32pServiceTable) / sizeof(SYSCALL_ENTRY)
 
 //
 // COM1 Log handle
@@ -137,7 +94,8 @@ VOID FuzzLogCallParameters(
     if (g_hLoggingPort == INVALID_HANDLE_VALUE)
         return;
 
-    ultostr_a(ServiceId, _strcpy_a(szLog, "[RoCall] ServiceId = "));
+    _strcpy_a(szLog, "[RoCall] ServiceId = ");
+    ultostr_a(ServiceId, _strend_a(szLog));
     ultostr_a(NumberOfArguments, _strcat_a(szLog, " NumberOfArgs = "));
     _strcat_a(szLog, " Arguments:");
 
@@ -218,7 +176,7 @@ system_call_x86(
         int 3
         int 3
 
-     syscall_stub:
+    syscall_stub:
         mov edx, 0x07FFE0300 //UserSharedData->SystemCall
         call dword ptr[edx]
         retn
@@ -340,16 +298,16 @@ void PrintServiceInformation(
 *
 */
 void FuzzRun(
-    _In_ UCHAR *ArgumentsTable,
-    _In_ CHAR **ServiceNames,
+    _In_ CONST SYSCALL_ENTRY *ServiceTable,
     _In_ BLACKLIST *BlackList,
     _In_ ULONG MinSyscallNumber,
     _In_ ULONG MaxSyscallNumber,
     _In_ BOOL IsWin32k
 )
 {
+    BOOLEAN bWasEnabled;
     CHAR* ServiceName;
-    ULONG ServiceIndex;
+    ULONG i, ServiceIndex;
     ULONG NumberOfArguments;
 
     DWORD dwThreadId;
@@ -358,15 +316,25 @@ void FuzzRun(
 
     CALL_PARAM CalleParam;
 
-    CHAR szConsoleText[200];
+    CHAR szConsoleText[400];
 
     OutputConsoleMessage("[+] Entering FuzzRun()\r\n\n");
-
 
     //
     // Assign much possible privileges if can.
     //
-    ForcePrivilegeEnabled();
+    for (i = SE_MIN_WELL_KNOWN_PRIVILEGE; i <= SE_MAX_WELL_KNOWN_PRIVILEGE; i++) {
+        _strcpy_a(szConsoleText, "[*] Privilege ");
+        ultostr_a(i, _strend_a(szConsoleText));
+
+        if (NT_SUCCESS(RtlAdjustPrivilege(i, TRUE, FALSE, &bWasEnabled))) {
+            _strcat_a(szConsoleText, " adjusted\r\n");
+        }
+        else {
+            _strcat_a(szConsoleText, " not adjusted\r\n");
+        }
+        OutputConsoleMessage(szConsoleText);
+    }
 
     //
     // Iterate through services and call them with predefined bad arguments.
@@ -378,25 +346,24 @@ void FuzzRun(
         ultostr_a(ServiceIndex, szConsoleText);
         SetConsoleTitleA(szConsoleText);
 
-
         //
         // Show generic syscall info.
         //
-        ServiceName = (CHAR*)ServiceNames[ServiceIndex];
+        ServiceName = (CHAR*)ServiceTable[ServiceIndex].Name;
 
         //
         // Log name.
         //
         FuzzLogCallName(ServiceName);
 
-        NumberOfArguments = ArgumentsTable[ServiceIndex] / sizeof(void*);
+        NumberOfArguments = ServiceTable[ServiceIndex].NumberOfArguments;
 
         PrintServiceInformation(NumberOfArguments,
             ServiceIndex,
             ServiceName);
 
         //
-        // Check if syscall blacklisted and skip if it is.
+        // Check if syscall blacklisted and skip it is.
         //
         if (BlackListEntryPresent(BlackList, (LPCSTR)ServiceName)) {
             OutputConsoleMessage("\t\t\t^^^^^ Service found in blacklist, skip\n\r");
@@ -410,7 +377,7 @@ void FuzzRun(
         CalleParam.ServiceId = ServiceIndex;
 
         if (IsWin32k) {
-            CalleParam.ServiceId += W32K_MIN_SYSCALL_NUMBER;
+            CalleParam.ServiceId += W32K_SYSCALL_ADJUST;
         }
 
         hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CallThread,
@@ -512,17 +479,36 @@ VOID FuzzInit(
 )
 {
     BOOL LogEnabled = FALSE;
-    UCHAR *ArgumentsTable;
-    CHAR **ServiceNames;
     BLACKLIST *BlackList;
+
+    CONST SYSCALL_ENTRY *ServiceTable;
 
     HMODULE hUser32 = NULL;
 
     ULONG MinSyscallNumber, MaxSyscallNumber;
 
-    CHAR szOut[200];
+    CHAR szOut[400];
 
     OutputConsoleMessage("[+] Entering FuzzInit()\r\n");
+
+    if (IsLocalSystem())
+        OutputConsoleMessage("[+] LocalSystem account\r\n");
+
+    //
+    // Show current directory.
+    //
+    RtlSecureZeroMemory(szOut, sizeof(szOut));
+    _strcpy_a(szOut, "[+] Current directory: ");
+    GetCurrentDirectoryA(MAX_PATH, _strend_a(szOut));
+    _strcat_a(szOut, "\r\n");
+    OutputConsoleMessage(szOut);
+
+    //
+    // Show command line.
+    //
+    OutputConsoleMessage("[+] Command line -> \r\n\r\n");
+    OutputConsoleMessage(GetCommandLineA());
+    OutputConsoleMessage("\r\n\r\n");
 
     RtlSecureZeroMemory(&g_rosVer, sizeof(REACTOS_VERSION));
 
@@ -585,10 +571,9 @@ VOID FuzzInit(
         RtlSecureZeroMemory(&g_W32kBlackList, sizeof(g_W32kBlackList));
         BlackListCreateFromFile(&g_W32kBlackList, (LPCSTR)CFG_FILE, (LPCSTR)"win32k");
 
-        ArgumentsTable = W32pServiceArgumentTable;
-        ServiceNames = (CHAR**)W32pServiceTableNames;
+        ServiceTable = W32pServiceTable;
 
-        MaxSyscallNumber = W32K_NUMBER_OF_SYSCALLS - 1;
+        MaxSyscallNumber = W32pServiceLimit;
 
         BlackList = &g_W32kBlackList;
     }
@@ -599,10 +584,9 @@ VOID FuzzInit(
         RtlSecureZeroMemory(&g_NtOsBlackList, sizeof(g_NtOsBlackList));
         BlackListCreateFromFile(&g_NtOsBlackList, (LPCSTR)CFG_FILE, (LPCSTR)"ntos");
 
-        ArgumentsTable = KiServiceArgumentTable;
-        ServiceNames = (CHAR**)KiServiceTableNames;
+        ServiceTable = KiServiceTable;
 
-        MaxSyscallNumber = NTOS_MAX_SYSCALL_NUMBER;
+        MaxSyscallNumber = KiServiceLimit;
 
         BlackList = &g_NtOsBlackList;
     }
@@ -613,7 +597,7 @@ VOID FuzzInit(
     szOut[0] = 0;
 
     if (syscallStartFrom >= MaxSyscallNumber) {
-        MinSyscallNumber = 0;
+        MinSyscallNumber = SYSCALL_ENTRY_FIRST;
         _strcpy_a(szOut, "[!] Invalid syscall start index specified, defaulted to 0\r\n");
     }
     else {
@@ -624,8 +608,11 @@ VOID FuzzInit(
     }
     OutputConsoleMessage(szOut);
 
-    FuzzRun(ArgumentsTable,
-        ServiceNames,
+    OutputConsoleMessage("[+] Waiting 5 sec to go\r\n");
+
+    Sleep(5000);
+
+    FuzzRun(ServiceTable,
         BlackList,
         MinSyscallNumber,
         MaxSyscallNumber,
@@ -644,44 +631,6 @@ VOID FuzzInit(
         FreeLibrary(hUser32);
 
     OutputConsoleMessage("[-] Leaving FuzzInit()\r\n");
-}
-
-/*
-* GetCommandLineOption
-*
-* Purpose:
-*
-* Parse command line options.
-*
-*/
-BOOL GetCommandLineOption(
-    _In_ LPCTSTR OptionName,
-    _In_ BOOL IsParametric,
-    _Out_writes_opt_z_(ValueSize) LPTSTR OptionValue,
-    _In_ ULONG ValueSize
-)
-{
-    LPTSTR	cmdline = GetCommandLine();
-    TCHAR   Param[64];
-    ULONG   rlen;
-    int		i = 0;
-
-    while (GetCommandLineParam(cmdline, i, Param, sizeof(Param), &rlen))
-    {
-        if (rlen == 0)
-            break;
-
-        if (_strcmp(Param, OptionName) == 0)
-        {
-            if (IsParametric)
-                return GetCommandLineParam(cmdline, i + 1, OptionValue, ValueSize, &rlen);
-
-            return TRUE;
-        }
-        ++i;
-    }
-
-    return 0;
 }
 
 #define T_USAGE "ROCALL - ReactOS syscall fuzzer\r\nUsage:  [-win32k] [-logn | -logv] [-pc Value] [-sc Value]\r\n\

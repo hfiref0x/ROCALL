@@ -4,9 +4,9 @@
 *
 *  TITLE:       UTIL.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        05 Dec 2018
+*  DATE:        07 Dec 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -29,8 +29,6 @@ typedef struct _BLACKLIST {
 } BLACKLIST, *PBLACKLIST;
 
 #define CFG_FILE "blacklist.ini"
-
-void ForcePrivilegeEnabled();
 
 DWORD BlackListHashString(
     _In_ LPCSTR Name);
@@ -58,3 +56,12 @@ BOOL GetReactOSVersion(
     _Out_ ULONG *MinorVersion,
     _Out_ ULONG *Build,
     _Out_ ULONG *Revision);
+
+BOOLEAN IsUserInAdminGroup();
+BOOLEAN IsLocalSystem();
+
+BOOL GetCommandLineOption(
+    _In_ LPCTSTR OptionName,
+    _In_ BOOL IsParametric,
+    _Out_writes_opt_z_(ValueSize) LPTSTR OptionValue,
+    _In_ ULONG ValueSize);

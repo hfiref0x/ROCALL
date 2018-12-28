@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        05 Dec 2018
+*  DATE:        07 Dec 2018
 *
 *  Global definitions.
 *
@@ -39,10 +39,11 @@
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up
 
 #include <Windows.h>
+#include <ntstatus.h>
 #include "roos.h"
 #include "minirtl/minirtl.h"
 #include "minirtl/_filename.h"
 #include "minirtl/cmdline.h"
 #include "util.h"
 #include "fuzz.h"
-
+#include "syscall.h"

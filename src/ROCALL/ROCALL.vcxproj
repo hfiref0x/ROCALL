@@ -106,6 +106,7 @@
   <ItemGroup>
     <ClInclude Include="fuzz.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="syscall.h" />
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="minirtl\rtltypes.h" />
     <ClInclude Include="roos.h" />

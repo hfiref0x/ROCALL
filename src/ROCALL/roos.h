@@ -4,9 +4,9 @@
 *
 *  TITLE:       ROOS.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        05 Dec 2018
+*  DATE:        06 Dec 2018
 *
 *  NTOS for ReactOS.
 *
@@ -122,6 +122,114 @@ char _RTL_CONSTANT_STRING_type_check(const void *s);
 
 #define NT_SUCCESS(Status) ((NTSTATUS)(Status) >= 0)
 
+typedef enum _SYSTEM_INFORMATION_CLASS {
+    SystemBasicInformation = 0,
+    SystemProcessorInformation = 1,
+    SystemPerformanceInformation = 2,
+    SystemTimeOfDayInformation = 3,
+    SystemPathInformation = 4,
+    SystemProcessInformation = 5,
+    SystemCallCountInformation = 6,
+    SystemDeviceInformation = 7,
+    SystemProcessorPerformanceInformation = 8,
+    SystemFlagsInformation = 9,
+    SystemCallTimeInformation = 10,
+    SystemModuleInformation = 11,
+    SystemLocksInformation = 12,
+    SystemStackTraceInformation = 13,
+    SystemPagedPoolInformation = 14,
+    SystemNonPagedPoolInformation = 15,
+    SystemHandleInformation = 16,
+} SYSTEM_INFORMATION_CLASS, *PSYSTEM_INFORMATION_CLASS;
+
+typedef enum _OBJECT_INFORMATION_CLASS {
+    ObjectBasicInformation,
+    ObjectNameInformation,
+    ObjectTypeInformation,
+    ObjectTypesInformation,
+    ObjectHandleFlagInformation,
+    MaxObjectInfoClass
+} OBJECT_INFORMATION_CLASS;
+
+typedef struct _OBJECT_TYPE_INFORMATION {
+    UNICODE_STRING TypeName;
+    ULONG TotalNumberOfObjects;
+    ULONG TotalNumberOfHandles;
+    ULONG TotalPagedPoolUsage;
+    ULONG TotalNonPagedPoolUsage;
+    ULONG TotalNamePoolUsage;
+    ULONG TotalHandleTableUsage;
+    ULONG HighWaterNumberOfObjects;
+    ULONG HighWaterNumberOfHandles;
+    ULONG HighWaterPagedPoolUsage;
+    ULONG HighWaterNonPagedPoolUsage;
+    ULONG HighWaterNamePoolUsage;
+    ULONG HighWaterHandleTableUsage;
+    ULONG InvalidAttributes;
+    GENERIC_MAPPING GenericMapping;
+    ULONG ValidAccessMask;
+    BOOLEAN SecurityRequired;
+    BOOLEAN MaintainHandleCount;
+    ULONG PoolType;
+    ULONG DefaultPagedPoolCharge;
+    ULONG DefaultNonPagedPoolCharge;
+} OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
+
+typedef struct _OBJECT_HANDLE_FLAG_INFORMATION {
+    BOOLEAN Inherit;
+    BOOLEAN ProtectFromClose;
+} OBJECT_HANDLE_FLAG_INFORMATION, *POBJECT_HANDLE_FLAG_INFORMATION;
+
+typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO {
+    USHORT UniqueProcessId;
+    USHORT CreatorBackTraceIndex;
+    UCHAR ObjectTypeIndex;
+    UCHAR HandleAttributes;
+    USHORT HandleValue;
+    PVOID Object;
+    ULONG GrantedAccess;
+} SYSTEM_HANDLE_TABLE_ENTRY_INFO, *PSYSTEM_HANDLE_TABLE_ENTRY_INFO;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION {
+    ULONG NumberOfHandles;
+    SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
+} SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+
+//
+// Privileges. Note ReactOS does not support full Windows set.
+//
+#define SE_MIN_WELL_KNOWN_PRIVILEGE       (2L)
+#define SE_CREATE_TOKEN_PRIVILEGE         (2L)
+#define SE_ASSIGNPRIMARYTOKEN_PRIVILEGE   (3L)
+#define SE_LOCK_MEMORY_PRIVILEGE          (4L)
+#define SE_INCREASE_QUOTA_PRIVILEGE       (5L)
+#define SE_UNSOLICITED_INPUT_PRIVILEGE    (6L)
+#define SE_MACHINE_ACCOUNT_PRIVILEGE      (6L)
+#define SE_TCB_PRIVILEGE                  (7L)
+#define SE_SECURITY_PRIVILEGE             (8L)
+#define SE_TAKE_OWNERSHIP_PRIVILEGE       (9L)
+#define SE_LOAD_DRIVER_PRIVILEGE          (10L)
+#define SE_SYSTEM_PROFILE_PRIVILEGE       (11L)
+#define SE_SYSTEMTIME_PRIVILEGE           (12L)
+#define SE_PROF_SINGLE_PROCESS_PRIVILEGE  (13L)
+#define SE_INC_BASE_PRIORITY_PRIVILEGE    (14L)
+#define SE_CREATE_PAGEFILE_PRIVILEGE      (15L)
+#define SE_CREATE_PERMANENT_PRIVILEGE     (16L)
+#define SE_BACKUP_PRIVILEGE               (17L)
+#define SE_RESTORE_PRIVILEGE              (18L)
+#define SE_SHUTDOWN_PRIVILEGE             (19L)
+#define SE_DEBUG_PRIVILEGE                (20L)
+#define SE_AUDIT_PRIVILEGE                (21L)
+#define SE_SYSTEM_ENVIRONMENT_PRIVILEGE   (22L)
+#define SE_CHANGE_NOTIFY_PRIVILEGE        (23L)
+#define SE_REMOTE_SHUTDOWN_PRIVILEGE      (24L)
+#define SE_UNDOCK_PRIVILEGE               (25L)
+#define SE_SYNC_AGENT_PRIVILEGE           (26L)
+#define SE_ENABLE_DELEGATION_PRIVILEGE    (27L)
+#define SE_MANAGE_VOLUME_PRIVILEGE        (28L)
+#define SE_IMPERSONATE_PRIVILEGE          (29L)
+#define SE_CREATE_GLOBAL_PRIVILEGE        (30L)
+#define SE_MAX_WELL_KNOWN_PRIVILEGE (SE_CREATE_GLOBAL_PRIVILEGE)
 
 //
 // Ntdll
@@ -150,6 +258,34 @@ NtOpenSection(
     _Out_ PHANDLE SectionHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_ POBJECT_ATTRIBUTES ObjectAttributes);
+
+NTSYSAPI
+NTSTATUS
+WINAPI
+NtQuerySystemInformation(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_writes_bytes_opt_(SystemInformationLength) PVOID SystemInformation,
+    _In_ ULONG SystemInformationLength,
+    _Out_opt_ PULONG ReturnLength);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetInformationObject(
+    _In_ HANDLE Handle,
+    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
+    _In_reads_bytes_(ObjectInformationLength) PVOID ObjectInformation,
+    _In_ ULONG ObjectInformationLength);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueryObject(
+    _In_opt_ HANDLE Handle,
+    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
+    _Out_writes_bytes_opt_(ObjectInformationLength) PVOID ObjectInformation,
+    _In_ ULONG ObjectInformationLength,
+    _Out_opt_ PULONG ReturnLength);
 
 #if defined(__cplusplus)
 }

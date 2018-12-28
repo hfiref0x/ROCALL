@@ -83,6 +83,9 @@
     <ClInclude Include="roos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="syscall.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resource.rc">

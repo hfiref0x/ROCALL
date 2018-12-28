@@ -4,9 +4,9 @@
 *
 *  TITLE:       UTIL.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        05 Dec 2018
+*  DATE:        07 Dec 2018
 *
 *  Program support routines.
 *
@@ -39,25 +39,6 @@ VOID FORCEINLINE InsertTailList(
     Entry->Blink = Blink;
     Blink->Flink = Entry;
     ListHead->Blink = Entry;
-}
-
-/*
-* ForcePrivilegeEnabled
-*
-* Purpose:
-*
-* Attempt to enable all known privileges.
-*
-*/
-void ForcePrivilegeEnabled()
-{
-    ULONG c;
-    BOOLEAN bWasEnabled;
-
-
-    for (c = 2; c <= 35; c++) {
-        RtlAdjustPrivilege(c, TRUE, FALSE, &bWasEnabled);
-    }
 }
 
 /*
@@ -95,9 +76,9 @@ BOOL IsReactOS(
     BOOL bResult = FALSE;
     HKEY hKey;
     DWORD dwType, dwSize;
-    LPWSTR lpBuffer;
+    LPTSTR lpBuffer;
     HANDLE hSection = NULL;
-    const WCHAR szRegKey[] = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+    const TCHAR szRegKey[] = TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
     STATIC_UNICODE_STRING(usSectionName, L"\\KnownDlls\\kernel32_vista.dll");
     OBJECT_ATTRIBUTES obja = RTL_INIT_OBJECT_ATTRIBUTES(&usSectionName, OBJ_CASE_INSENSITIVE);
 
@@ -108,20 +89,20 @@ BOOL IsReactOS(
 
     if (bResult == FALSE) {
 
-        if (ERROR_SUCCESS == RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+        if (ERROR_SUCCESS == RegOpenKeyEx(HKEY_LOCAL_MACHINE,
             szRegKey, 0, KEY_QUERY_VALUE, &hKey))
         {
             if (ERROR_SUCCESS == RegQueryValueEx(hKey,
-                L"ProductName", NULL, &dwType, NULL, &dwSize))
+                TEXT("ProductName"), NULL, &dwType, NULL, &dwSize))
             {
                 if (dwType == REG_SZ) {
-                    lpBuffer = (LPWSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwSize);
+                    lpBuffer = (LPTSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwSize);
                     if (lpBuffer) {
 
-                        if (ERROR_SUCCESS == RegQueryValueExW(hKey,
-                            L"ProductName", NULL, &dwType, (LPBYTE)lpBuffer, &dwSize))
+                        if (ERROR_SUCCESS == RegQueryValueEx(hKey,
+                            TEXT("ProductName"), NULL, &dwType, (LPBYTE)lpBuffer, &dwSize))
                         {
-                            bResult = (_strcmpi_w(lpBuffer, L"ReactOS") == 0);
+                            bResult = (_strcmpi(lpBuffer, TEXT("ReactOS")) == 0);
                         }
                         HeapFree(GetProcessHeap(), 0, lpBuffer);
                     }
@@ -387,4 +368,159 @@ BOOL GetReactOSVersion(
         Revision);
 
     return bResult;
+}
+
+/*
+* IsUserInAdminGroup
+*
+* Purpose:
+*
+* Returns TRUE if current user is in admin group.
+*
+*/
+BOOLEAN IsUserInAdminGroup()
+{
+    BOOLEAN bResult = FALSE;
+    HANDLE hToken;
+
+    ULONG returnLength, i;
+
+    PSID pSid = NULL;
+
+    PTOKEN_GROUPS ptg = NULL;
+
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+
+        GetTokenInformation(hToken, TokenGroups, NULL, 0, &returnLength);
+
+        ptg = (PTOKEN_GROUPS)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)returnLength);
+        if (ptg) {
+
+            if (GetTokenInformation(hToken,
+                TokenGroups,
+                ptg,
+                returnLength,
+                &returnLength))
+            {
+                if (AllocateAndInitializeSid(&NtAuthority,
+                    2,
+                    SECURITY_BUILTIN_DOMAIN_RID,
+                    DOMAIN_ALIAS_RID_ADMINS,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    &pSid))
+                {
+                    for (i = 0; i < ptg->GroupCount; i++) {
+                        if (EqualSid(pSid, ptg->Groups[i].Sid)) {
+                            bResult = TRUE;
+                            break;
+                        }
+                    }
+
+                    FreeSid(pSid);
+                }
+            }
+
+            HeapFree(GetProcessHeap(), 0, ptg);
+        }
+        CloseHandle(hToken);
+    }
+    return bResult;
+}
+
+/*
+* IsLocalSystem
+*
+* Purpose:
+*
+* Returns TRUE if current user is LocalSystem.
+*
+*/
+BOOLEAN IsLocalSystem()
+{
+    BOOLEAN bResult = FALSE;
+    ULONG returnLength;
+    HANDLE hToken;
+    TOKEN_USER *ptu;
+
+    PSID pSid;
+
+    BYTE TokenInformation[256];
+
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+        if (GetTokenInformation(hToken, TokenUser, &TokenInformation,
+            sizeof(TokenInformation), &returnLength))
+        {
+
+            if (AllocateAndInitializeSid(&NtAuthority,
+                1,
+                SECURITY_LOCAL_SYSTEM_RID,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                &pSid))
+            {
+                ptu = (PTOKEN_USER)&TokenInformation;
+
+                bResult = (EqualSid(pSid, ptu->User.Sid) != 0);
+
+                FreeSid(pSid);
+            }
+
+        }
+
+        CloseHandle(hToken);
+    }
+
+    return bResult;
+}
+
+/*
+* GetCommandLineOption
+*
+* Purpose:
+*
+* Parse command line options.
+*
+*/
+BOOL GetCommandLineOption(
+    _In_ LPCTSTR OptionName,
+    _In_ BOOL IsParametric,
+    _Out_writes_opt_z_(ValueSize) LPTSTR OptionValue,
+    _In_ ULONG ValueSize
+)
+{
+    LPTSTR	cmdline = GetCommandLine();
+    TCHAR   Param[64];
+    ULONG   rlen;
+    int		i = 0;
+
+    while (GetCommandLineParam(cmdline, i, Param, sizeof(Param), &rlen))
+    {
+        if (rlen == 0)
+            break;
+
+        if (_strcmp(Param, OptionName) == 0)
+        {
+            if (IsParametric)
+                return GetCommandLineParam(cmdline, i + 1, OptionValue, ValueSize, &rlen);
+
+            return TRUE;
+        }
+        ++i;
+    }
+
+    return 0;
 }

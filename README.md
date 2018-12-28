@@ -10,9 +10,9 @@
 # Usage
 ROCALL [-win32k] [-logn | logv ] [-pc Value] [-sc Value]
 * -logn     - enable logging via COM1 port, service name will be logged, default disabled;
-* -logv     - enable logging via COM1 port, service name and call parameters will be logged( slow), default disabled;
+* -logv     - enable logging via COM1 port, service name and call parameters will be logged(slow), default disabled;
 * -win32k   - launch win32k service table fuzzing, default ntoskrnl service table fuzzing;
-* -pc Value - number of passes for each service (default value 1024);
+* -pc Value - number of passes for each service, default value 1024;
 * -sc Value - start fuzzing from service entry number (index from 0), default 0.
 
 When used without parameters RoCall will start fuzzing system service table.
