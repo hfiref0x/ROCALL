@@ -8,12 +8,14 @@
 + Account with administrative privileges (optional).
 
 # Usage
-ROCALL [-win32k] [-logn | logv ] [-pc Value] [-sc Value]
+ROCALL [-win32k] [-logn | logv ] [-pc Value] [-wt Value] [-sc Value] [-s]
 * -logn     - enable logging via COM1 port, service name will be logged, default disabled;
 * -logv     - enable logging via COM1 port, service name and call parameters will be logged(slow), default disabled;
 * -win32k   - launch win32k service table fuzzing, default ntoskrnl service table fuzzing;
 * -pc Value - number of passes for each service, default value 1024;
-* -sc Value - start fuzzing from service entry number (index from 0), default 0.
+* -wt Value - wait timeout in seconds, default value 30;
+* -sc Value - start fuzzing from service entry number (index from 0), default 0;
+* -s        - restart program under LocalSystem account.
 
 When used without parameters RoCall will start fuzzing system service table.
 
@@ -32,6 +34,8 @@ Example:
 + ROCALL -win32k -logv -pc 1234
 + ROCALL -win32k -logn -pc 1234 -sc 100
 + ROCALL -win32k -logv -pc 1234 -sc 100
++ ROCALL -wt 40
++ ROCALL -s
 
 
 Note: make sure to configure virtual machine COM1 port settings before trying this tool.
@@ -74,10 +78,12 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
 * Select Platform ToolSet first for project in solution you want to build (Project->Properties->General): 
   * v120 for Visual Studio 2013;
   * v140 for Visual Studio 2015; 
-  * v141 for Visual Studio 2017.
+  * v141 for Visual Studio 2017;
+  * v142 for Visual Studio 2019.
 * For v140 and above set Target Platform Version (Project->Properties->General):
-  * If v140 then select 8.1 (Note that Windows 8.1 SDK must be installed);
-  * If v141 then select 10.0.17134.0 (Note that Windows 10.0.17134 SDK must be installed). 
+  * If v140 then select 8.1;
+  * If v141/v142 then select 10. 
+* Minimum required Windows SDK version is 8.1.
 
 # Bugs found with ROCALL
 
@@ -85,4 +91,4 @@ Making ReactOS Great Again, http://www.kernelmode.info/forum/viewtopic.php?f=11&
 
 # Authors
 
-(c) 2018 ROCALL Project
+(c) 2018 - 2019 ROCALL Project

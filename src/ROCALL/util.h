@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2019
 *
 *  TITLE:       UTIL.H
 *
-*  VERSION:     1.01
+*  VERSION:     1.02
 *
-*  DATE:        07 Dec 2018
+*  DATE:        30 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -59,9 +59,23 @@ BOOL GetReactOSVersion(
 
 BOOLEAN IsUserInAdminGroup();
 BOOLEAN IsLocalSystem();
+BOOLEAN IsRCHDrvLoaded();
 
 BOOL GetCommandLineOption(
     _In_ LPCTSTR OptionName,
     _In_ BOOL IsParametric,
     _Out_writes_opt_z_(ValueSize) LPTSTR OptionValue,
     _In_ ULONG ValueSize);
+
+VOID TryRunAsService(
+    _In_ BOOLEAN IsRunAsLocalSystem,
+    _In_ ROCALL_PARAMS *SessionParams);
+
+PVOID QuerySystemInformationByClass(
+    _In_ SYSTEM_INFORMATION_CLASS InfoClass);
+
+VOID SessionParamsRemove();
+
+VOID SessionParamsManage(
+    _In_ BOOLEAN fSet,
+    _Inout_ ROCALL_PARAMS *SessionParams);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2019
 *
 *  TITLE:       ROOS.H
 *
-*  VERSION:     1.01
+*  VERSION:     1.02
 *
-*  DATE:        06 Dec 2018
+*  DATE:        30 Nov 2019
 *
 *  NTOS for ReactOS.
 *
@@ -30,6 +30,10 @@
 
 #if defined (__cplusplus)
 extern "C" {
+#endif
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 0x1000
 #endif
 
 typedef struct _UNICODE_STRING {
@@ -194,6 +198,24 @@ typedef struct _SYSTEM_HANDLE_INFORMATION {
     ULONG NumberOfHandles;
     SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
 } SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+
+typedef struct _RTL_PROCESS_MODULE_INFORMATION {
+    ULONG Section;
+    PVOID MappedBase;
+    PVOID ImageBase;
+    ULONG ImageSize;
+    ULONG Flags;
+    USHORT LoadOrderIndex;
+    USHORT InitOrderIndex;
+    USHORT LoadCount;
+    USHORT OffsetToFileName;
+    CHAR FullPathName[256];
+} RTL_PROCESS_MODULE_INFORMATION, *PRTL_PROCESS_MODULE_INFORMATION;
+
+typedef struct _RTL_PROCESS_MODULES {
+    ULONG NumberOfModules;
+    RTL_PROCESS_MODULE_INFORMATION Modules[1];
+} RTL_PROCESS_MODULES, *PRTL_PROCESS_MODULES;
 
 //
 // Privileges. Note ReactOS does not support full Windows set.

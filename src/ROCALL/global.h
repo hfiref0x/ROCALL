@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2019
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.01
+*  VERSION:     1.02
 *
-*  DATE:        07 Dec 2018
+*  DATE:        30 Nov 2019
 *
 *  Global definitions.
 *
@@ -44,6 +44,30 @@
 #include "minirtl/minirtl.h"
 #include "minirtl/_filename.h"
 #include "minirtl/cmdline.h"
+
+typedef struct _ROCALL_PARAMS {
+
+    //
+    // Custom options enabled.
+    //
+    BOOL ProbeWin32kOption;
+    BOOL EnableLogOption;
+    BOOL VerboseLogOption;
+    BOOL SyscallStartFromOption;
+    BOOL PassCountOption;
+    BOOL WaitTimeoutOption;
+
+    //
+    // Actual settings.
+    //
+    BOOL ProbeWin32k;
+    BOOL EnableLog;
+    BOOL VerboseLog;
+    DWORD SyscallStartFrom;
+    DWORD PassCount;
+    DWORD WaitTimeout;
+} ROCALL_PARAMS, *PROCALL_PARAMS;
+
 #include "util.h"
 #include "fuzz.h"
 #include "syscall.h"

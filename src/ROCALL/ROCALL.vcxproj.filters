@@ -60,6 +60,9 @@
     <ClCompile Include="minirtl\strtoul.c">
       <Filter>minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="minirtl\_strstri.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="minirtl\minirtl.h">
