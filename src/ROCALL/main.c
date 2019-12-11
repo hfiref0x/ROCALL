@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        30 Nov 2019
+*  DATE:        07 Dec 2019
 *
 *  Program entry point.
 *
@@ -448,7 +448,7 @@ void FuzzRun(
 * Open COM1 port for logging.
 *
 */
-BOOL FuzzOpenLog(
+BOOLEAN FuzzOpenLog(
     VOID
 )
 {
@@ -515,7 +515,7 @@ VOID FuzzInit(
     _In_ ROCALL_PARAMS *SessionParams
 )
 {
-    BOOL LogEnabled = FALSE;
+    BOOLEAN LogEnabled = FALSE, CheckedBuild = FALSE;
     BLACKLIST *BlackList;
 
     CONST SYSCALL_ENTRY *ServiceTable;
@@ -535,6 +535,17 @@ VOID FuzzInit(
         OutputConsoleMessage("[+] RCHDRV is loaded\r\n");
     else
         OutputConsoleMessage("[+] RCHDRV is not loaded\r\n");
+
+    CheckedBuild = IsCheckedBuild();
+    if (CheckedBuild) {
+#ifndef _USE_CHECKED_TABLE
+        if (SessionParams->ProbeWin32k) {
+            OutputConsoleMessage("[!] ReactOS build type is Checked and win32k table probe selected!\r\n");
+            OutputConsoleMessage("[!] Use ROCALL for Checked builds, aborting.\r\n");
+            goto Done;
+        }
+#endif
+    }
 
     //
     // Show current directory.
@@ -604,6 +615,13 @@ VOID FuzzInit(
 
     if (SessionParams->ProbeWin32k) {
         OutputConsoleMessage("[*] Probing win32k table.\r\n");
+
+#ifdef _USE_CHECKED_TABLE
+        OutputConsoleMessage("[+] Checked build tables will be used\r\n");
+#else
+        OutputConsoleMessage("[+] Release build tables will be used\r\n");
+#endif
+
         Sleep(1000);
 
         //
@@ -633,6 +651,14 @@ VOID FuzzInit(
 
         BlackList = &g_NtOsBlackList;
     }
+
+    //
+    // Show limit value.
+    //
+    _strcpy_a(szOut, "[+] Syscall limit = ");
+    ultostr_a(MaxSyscallNumber, _strend_a(szOut));
+    _strcat_a(szOut, "\r\n");
+    OutputConsoleMessage(szOut);
 
     //
     // Set starting syscall index.
@@ -675,6 +701,7 @@ VOID FuzzInit(
 
     SessionParamsRemove();
 
+Done:
     OutputConsoleMessage("[-] Leaving FuzzInit()\r\n");
 }
 

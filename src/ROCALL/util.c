@@ -4,9 +4,9 @@
 *
 *  TITLE:       UTIL.C
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        30 Nov 2019
+*  DATE:        07 Dec 2019
 *
 *  Program support routines.
 *
@@ -1117,4 +1117,46 @@ BOOLEAN IsRCHDrvLoaded()
         HeapFree(GetProcessHeap(), 0, Modules);
     }
     return FALSE;
+}
+
+/*
+* IsCheckedBuild
+*
+* Purpose:
+*
+* Return TRUE if this is checked build, false otherwise.
+*
+*/
+BOOLEAN IsCheckedBuild()
+{
+    BOOLEAN bResult = FALSE;
+    HKEY hKey;
+    DWORD dwType, dwSize;
+    LPTSTR lpBuffer;
+    const TCHAR szRegKey[] = TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+
+    if (ERROR_SUCCESS == RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+        szRegKey, 0, KEY_QUERY_VALUE, &hKey))
+    {
+        if (ERROR_SUCCESS == RegQueryValueEx(hKey,
+            TEXT("CurrentType"), NULL, &dwType, NULL, &dwSize))
+        {
+            if (dwType == REG_SZ) {
+                lpBuffer = (LPTSTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwSize);
+                if (lpBuffer) {
+
+                    if (ERROR_SUCCESS == RegQueryValueEx(hKey,
+                        TEXT("CurrentType"), NULL, &dwType, (LPBYTE)lpBuffer, &dwSize))
+                    {
+                        bResult = (_strstri(lpBuffer, TEXT("Checked")) != NULL);
+                    }
+                    HeapFree(GetProcessHeap(), 0, lpBuffer);
+                }
+            }
+        }
+
+        RegCloseKey(hKey);
+    }
+
+    return bResult;
 }

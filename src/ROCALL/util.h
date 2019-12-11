@@ -4,9 +4,9 @@
 *
 *  TITLE:       UTIL.H
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        30 Nov 2019
+*  DATE:        07 Dec 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -60,6 +60,7 @@ BOOL GetReactOSVersion(
 BOOLEAN IsUserInAdminGroup();
 BOOLEAN IsLocalSystem();
 BOOLEAN IsRCHDrvLoaded();
+BOOLEAN IsCheckedBuild();
 
 BOOL GetCommandLineOption(
     _In_ LPCTSTR OptionName,
