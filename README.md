@@ -87,7 +87,7 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
 
 # Bugs found with ROCALL
 
-Making ReactOS Great Again, http://www.kernelmode.info/forum/viewtopic.php?f=11&t=5302 (Long list and explanation)
+Making ReactOS Great Again, https://www.kernelmode.info/forum/viewtopic6f46.html?f=11&t=5302 (Long list and explanation)
 
 # Authors
 
