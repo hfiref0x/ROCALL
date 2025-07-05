@@ -5,7 +5,7 @@ ROCALL is a fuzzer for ReactOS system calls with enhanced parameter type detecti
 
 # System Requirements
 
-+ ReactOS x86-32 (tested with 4.15);
++ ReactOS x86-32 (tested with 0.4.15);
 + Account with administrative privileges (optional).
 
 # Usage
