@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2019
+*  (C) COPYRIGHT AUTHORS, 2018 - 2025
 *
 *  TITLE:       ROOS.H
 *
-*  VERSION:     1.02
+*  VERSION:     1.04
 *
-*  DATE:        30 Nov 2019
+*  DATE:        07 Jul 2025
 *
 *  NTOS for ReactOS.
 *
@@ -155,6 +155,14 @@ typedef enum _OBJECT_INFORMATION_CLASS {
     MaxObjectInfoClass
 } OBJECT_INFORMATION_CLASS;
 
+typedef enum _MEMORY_INFORMATION_CLASS {
+    MemoryBasicInformation,
+    MemoryWorkingSetList,
+    MemorySectionName,
+    MemoryBasicVlmInformation,
+    MemoryWorkingSetExList
+} MEMORY_INFORMATION_CLASS;
+
 typedef struct _OBJECT_TYPE_INFORMATION {
     UNICODE_STRING TypeName;
     ULONG TotalNumberOfObjects;
@@ -217,6 +225,130 @@ typedef struct _RTL_PROCESS_MODULES {
     RTL_PROCESS_MODULE_INFORMATION Modules[1];
 } RTL_PROCESS_MODULES, *PRTL_PROCESS_MODULES;
 
+typedef struct _IO_STATUS_BLOCK {
+    ULONG Status;
+    ULONG Information;
+} IO_STATUS_BLOCK, * PIO_STATUS_BLOCK;
+
+typedef struct _CLIENT_ID
+{
+    HANDLE UniqueProcess;
+    HANDLE UniqueThread;
+} CLIENT_ID, * PCLIENT_ID;
+
+typedef struct _KERNEL_USER_TIMES {
+    LARGE_INTEGER  CreateTime;
+    LARGE_INTEGER  ExitTime;
+    LARGE_INTEGER  KernelTime;
+    LARGE_INTEGER  UserTime;
+} KERNEL_USER_TIMES, * PKERNEL_USER_TIMES;
+
+typedef struct _SECTION_IMAGE_INFORMATION {
+    PVOID TransferAddress;
+    ULONG ZeroBits;
+    SIZE_T MaximumStackSize;
+    SIZE_T CommittedStackSize;
+    ULONG SubSystemType;
+    WORD SubsystemVersionLow;
+    WORD SubsystemVersionHigh;
+    ULONG GpValue;
+    USHORT ImageCharacteristics;
+    USHORT DllCharacteristics;
+    USHORT Machine;
+    BOOLEAN ImageContainsCode;
+    union
+    {
+        UCHAR ImageFlags;
+        struct
+        {
+            UCHAR ComPlusNativeReady : 1;
+            UCHAR ComPlusILOnly : 1;
+            UCHAR ImageDynamicallyRelocated : 1;
+            UCHAR ImageMappedFlat : 1;
+            UCHAR BaseBelow4gb : 1;
+            UCHAR Reserved : 3;
+        } DUMMYSTRUCTNAME;
+    } DUMMYUNIONNAME;
+    ULONG LoaderFlags;
+    ULONG ImageFileSize;
+    ULONG CheckSum;
+} SECTION_IMAGE_INFORMATION, * PSECTION_IMAGE_INFORMATION;
+
+typedef struct _KEY_VALUE_PARTIAL_INFORMATION {
+    ULONG TitleIndex;
+    ULONG Type;
+    ULONG DataLength;
+    _Field_size_bytes_(DataLength) UCHAR Data[1];
+} KEY_VALUE_PARTIAL_INFORMATION, * PKEY_VALUE_PARTIAL_INFORMATION;
+
+typedef struct _KEY_VALUE_BASIC_INFORMATION {
+    ULONG TitleIndex;
+    ULONG Type;
+    ULONG NameLength;
+    WCHAR Name[1];
+} KEY_VALUE_BASIC_INFORMATION, * PKEY_VALUE_BASIC_INFORMATION;
+
+typedef struct _KEY_VALUE_PARTIAL_INFORMATION_ALIGN64
+{
+    ULONG Type;
+    ULONG DataLength;
+    UCHAR Data[1];
+} KEY_VALUE_PARTIAL_INFORMATION_ALIGN64, * PKEY_VALUE_PARTIAL_INFORMATION_ALIGN64;
+
+typedef struct _KEY_VALUE_FULL_INFORMATION {
+    ULONG TitleIndex;
+    ULONG Type;
+    ULONG DataOffset;
+    ULONG DataLength;
+    ULONG NameLength;
+    WCHAR Name[1];
+} KEY_VALUE_FULL_INFORMATION, * PKEY_VALUE_FULL_INFORMATION;
+
+typedef struct _PEB_LDR_DATA {
+    ULONG Length;
+    BOOLEAN Initialized;
+    PVOID SsHandle;
+    LIST_ENTRY InLoadOrderModuleList;
+    LIST_ENTRY InMemoryOrderModuleList;
+    LIST_ENTRY InInitializationOrderModuleList;
+    PVOID EntryInProgress;
+#if (NTDDI_VERSION >= NTDDI_WIN7)
+    UCHAR ShutdownInProgress;
+    PVOID ShutdownThreadId;
+#endif
+} PEB_LDR_DATA, * PPEB_LDR_DATA;
+
+typedef struct _LDR_DATA_TABLE_ENTRY
+{
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    LIST_ENTRY InInitializationOrderLinks;
+    PVOID DllBase;
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;
+    ULONG Flags;
+    USHORT LoadCount;
+    USHORT TlsIndex;
+    union
+    {
+        LIST_ENTRY HashLinks;
+        struct
+        {
+            PVOID SectionPointer;
+            ULONG CheckSum;
+        };
+    };
+    union
+    {
+        ULONG TimeDateStamp;
+        PVOID LoadedImports;
+    };
+    PVOID EntryPointActivationContext;
+    PVOID PatchInformation;
+} LDR_DATA_TABLE_ENTRY, * PLDR_DATA_TABLE_ENTRY;
+
 //
 // Privileges. Note ReactOS does not support full Windows set.
 //
@@ -252,6 +384,184 @@ typedef struct _RTL_PROCESS_MODULES {
 #define SE_IMPERSONATE_PRIVILEGE          (29L)
 #define SE_CREATE_GLOBAL_PRIVILEGE        (30L)
 #define SE_MAX_WELL_KNOWN_PRIVILEGE (SE_CREATE_GLOBAL_PRIVILEGE)
+
+/*
+** List Entry macro START (wdm.h)
+*/
+
+#if defined (ROOS_ENABLE_LIST_ENTRY_MACRO)
+
+#define InitializeListHead32(ListHead) (\
+    (ListHead)->Flink = (ListHead)->Blink = PtrToUlong((ListHead)))
+
+FORCEINLINE
+VOID
+InitializeListHead(
+    _Out_ PLIST_ENTRY ListHead
+)
+{
+    ListHead->Flink = ListHead->Blink = ListHead;
+    return;
+}
+
+_Must_inspect_result_
+BOOLEAN
+CFORCEINLINE
+IsListEmpty(
+    _In_ const LIST_ENTRY* ListHead
+)
+{
+    return (BOOLEAN)(ListHead->Flink == ListHead);
+}
+
+FORCEINLINE
+BOOLEAN
+RemoveEntryList(
+    _In_ PLIST_ENTRY Entry
+)
+{
+    PLIST_ENTRY Blink;
+    PLIST_ENTRY Flink;
+
+    Flink = Entry->Flink;
+    Blink = Entry->Blink;
+    Blink->Flink = Flink;
+    Flink->Blink = Blink;
+    return (BOOLEAN)(Flink == Blink);
+}
+
+FORCEINLINE
+PLIST_ENTRY
+RemoveHeadList(
+    _Inout_ PLIST_ENTRY ListHead
+)
+{
+    PLIST_ENTRY Flink;
+    PLIST_ENTRY Entry;
+
+    Entry = ListHead->Flink;
+    Flink = Entry->Flink;
+    ListHead->Flink = Flink;
+    Flink->Blink = ListHead;
+    return Entry;
+}
+
+FORCEINLINE
+PLIST_ENTRY
+RemoveTailList(
+    _Inout_ PLIST_ENTRY ListHead
+)
+{
+    PLIST_ENTRY Blink;
+    PLIST_ENTRY Entry;
+
+    Entry = ListHead->Blink;
+    Blink = Entry->Blink;
+    ListHead->Blink = Blink;
+    Blink->Flink = ListHead;
+    return Entry;
+}
+
+FORCEINLINE
+VOID
+InsertTailList(
+    _Inout_ PLIST_ENTRY ListHead,
+    _Inout_ __drv_aliasesMem PLIST_ENTRY Entry
+)
+{
+    PLIST_ENTRY Blink;
+
+    Blink = ListHead->Blink;
+    Entry->Flink = ListHead;
+    Entry->Blink = Blink;
+    Blink->Flink = Entry;
+    ListHead->Blink = Entry;
+    return;
+}
+
+FORCEINLINE
+VOID
+InsertHeadList(
+    _Inout_ PLIST_ENTRY ListHead,
+    _Inout_ __drv_aliasesMem PLIST_ENTRY Entry
+)
+{
+    PLIST_ENTRY Flink;
+
+    Flink = ListHead->Flink;
+    Entry->Flink = Flink;
+    Entry->Blink = ListHead;
+    Flink->Blink = Entry;
+    ListHead->Flink = Entry;
+    return;
+}
+
+FORCEINLINE
+VOID
+AppendTailList(
+    _Inout_ PLIST_ENTRY ListHead,
+    _Inout_ PLIST_ENTRY ListToAppend
+)
+{
+    PLIST_ENTRY ListEnd = ListHead->Blink;
+
+    ListHead->Blink->Flink = ListToAppend;
+    ListHead->Blink = ListToAppend->Blink;
+    ListToAppend->Blink->Flink = ListHead;
+    ListToAppend->Blink = ListEnd;
+    return;
+}
+
+FORCEINLINE
+PSINGLE_LIST_ENTRY
+PopEntryList(
+    _Inout_ PSINGLE_LIST_ENTRY ListHead
+)
+{
+    PSINGLE_LIST_ENTRY FirstEntry;
+
+    FirstEntry = ListHead->Next;
+    if (FirstEntry != NULL) {
+        ListHead->Next = FirstEntry->Next;
+    }
+
+    return FirstEntry;
+}
+
+FORCEINLINE
+VOID
+PushEntryList(
+    _Inout_ PSINGLE_LIST_ENTRY ListHead,
+    _Inout_ __drv_aliasesMem PSINGLE_LIST_ENTRY Entry
+)
+{
+    Entry->Next = ListHead->Next;
+    ListHead->Next = Entry;
+    return;
+}
+
+#define ASSERT_LIST_ENTRY_VALID(ListEntry) {                    \
+    if (ListEntry == NULL)                                      \
+        return;                                                 \
+    if (ListEntry->Flink == NULL || ListEntry->Blink == NULL)   \
+        return;                                                 \
+}
+
+#define ASSERT_LIST_ENTRY_VALID_ERROR_X(ListEntry, X) {         \
+    if (ListEntry == NULL)                                      \
+        return X;                                               \
+    if (ListEntry->Flink == NULL || ListEntry->Blink == NULL)   \
+        return X;                                               \
+}
+
+#define ASSERT_LIST_ENTRY_VALID_BOOLEAN(ListEntry) ASSERT_LIST_ENTRY_VALID_ERROR_X(ListEntry, FALSE)
+
+#endif /* ROOS_ENABLE_LIST_ENTRY_MACRO */
+
+/*
+** List Entry macro END
+*/
+
 
 //
 // Ntdll
@@ -308,6 +618,24 @@ NtQueryObject(
     _Out_writes_bytes_opt_(ObjectInformationLength) PVOID ObjectInformation,
     _In_ ULONG ObjectInformationLength,
     _Out_opt_ PULONG ReturnLength);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtUnmapViewOfSection(
+    _In_ HANDLE ProcessHandle,
+    _In_ PVOID BaseAddress);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueryVirtualMemory(
+    _In_ HANDLE ProcessHandle,
+    _In_ PVOID Address,
+    _In_ MEMORY_INFORMATION_CLASS VirtualMemoryInformationClass,
+    _Out_ PVOID VirtualMemoryInformation,
+    _In_ SIZE_T Length,
+    _Out_opt_ PSIZE_T ResultLength);
 
 #if defined(__cplusplus)
 }

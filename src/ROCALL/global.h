@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2019
+*  (C) COPYRIGHT AUTHORS, 2018 - 2025
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.02
+*  VERSION:     2.00
 *
-*  DATE:        30 Nov 2019
+*  DATE:        05 Jul 2025
 *
 *  Global definitions.
 *
@@ -22,7 +22,7 @@
 #endif
 
 #if defined (_MSC_VER)
-#if (_MSC_VER >= 1900) //VS15, 17 etc
+#if (_MSC_VER >= 1900)
 #ifdef _DEBUG
 #pragma comment(lib, "vcruntimed.lib")
 #pragma comment(lib, "ucrtd.lib")
@@ -33,41 +33,63 @@
 #endif
 #endif
 
+#pragma comment(lib, "version.lib")
+
 #pragma warning(disable: 4005) // macro redefinition
 #pragma warning(disable: 4152) // nonstandard extension, function/data pointer conversion in expression
 #pragma warning(disable: 4201) // nonstandard extension used : nameless struct/union
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up
 
+#define ROOS_ENABLE_LIST_ENTRY_MACRO
+
 #include <Windows.h>
 #include <ntstatus.h>
+#include <intrin.h>
+#include <TlHelp32.h>
+#include "safestr.h"
 #include "roos.h"
 #include "minirtl/minirtl.h"
 #include "minirtl/_filename.h"
 #include "minirtl/cmdline.h"
+#include "blacklist.h"
 
-typedef struct _ROCALL_PARAMS {
+#define TEXT_COLOR_CYAN FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY
+#define TEXT_COLOR_RED FOREGROUND_RED | FOREGROUND_INTENSITY
+#define TEXT_COLOR_YELLOW (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
 
-    //
-    // Custom options enabled.
-    //
-    BOOL ProbeWin32kOption;
-    BOOL EnableLogOption;
-    BOOL VerboseLogOption;
-    BOOL SyscallStartFromOption;
-    BOOL PassCountOption;
-    BOOL WaitTimeoutOption;
-
-    //
-    // Actual settings.
-    //
+typedef struct _FUZZ_PARAMS {
     BOOL ProbeWin32k;
-    BOOL EnableLog;
-    BOOL VerboseLog;
+    BOOL LogEnabled;
+    BOOL LogToFile;
+    BOOL EnableParamsHeuristic;
+    BOOL ProbeFromSyscallId;
     DWORD SyscallStartFrom;
     DWORD PassCount;
     DWORD WaitTimeout;
-} ROCALL_PARAMS, *PROCALL_PARAMS;
+    WCHAR szLogDeviceOrFile[MAX_PATH + 1];
+} FUZZ_PARAMS, *PFUZZ_PARAMS;
 
-#include "util.h"
-#include "fuzz.h"
+typedef enum _FUZZ_ALLOC_TYPE {
+    AllocTypeVirtualAlloc,
+    AllocTypeSid
+} FUZZ_ALLOC_TYPE;
+
+#define MAX_FUZZING_ALLOCATIONS 32
+typedef struct _FUZZ_MEMORY_TRACKER {
+    ULONG Count;
+    PVOID Addresses[MAX_FUZZING_ALLOCATIONS];
+    FUZZ_ALLOC_TYPE Types[MAX_FUZZING_ALLOCATIONS];
+    BOOLEAN InUse;
+} FUZZ_MEMORY_TRACKER, * PFUZZ_MEMORY_TRACKER;
+
+#include "sup.h"
+#include "log.h"
 #include "syscall.h"
+#include "fuzz.h"
+
+extern FUZZ_MEMORY_TRACKER g_MemoryTracker;
+extern FUZZ_STATS g_FuzzStats;
+extern LOG_PARAMS g_Log;
+extern BLACKLIST g_BlackList;
+
+

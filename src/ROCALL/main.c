@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2019
+*  (C) COPYRIGHT AUTHORS, 2018 - 2025
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.03
+*  VERSION:     2.00
 *
-*  DATE:        07 Dec 2019
+*  DATE:        07 Jul 2025
 *
 *  Program entry point.
 *
@@ -19,130 +19,56 @@
 *
 *******************************************************************************/
 
-#pragma once
-
 #include "global.h"
 
-#define SYSCALL_ENTRY_FIRST 0
-#define W32K_SYSCALL_ADJUST 0x1000
-#define KiServiceLimit      sizeof(KiServiceTable) / sizeof(SYSCALL_ENTRY)
-#define W32pServiceLimit    sizeof(W32pServiceTable) / sizeof(SYSCALL_ENTRY)
+#define PARAM_HELP          TEXT("-help")
+#define PARAM_LOG           TEXT("-log")
+#define PARAM_OUTPUT        TEXT("-o")
+#define PARAM_WIN32K        TEXT("-win32k")
+#define PARAM_PASSCOUNT     TEXT("-pc")
+#define PARAM_WAITTIMEOUT   TEXT("-wt")
+#define PARAM_SYSCALL_START TEXT("-sc")
+#define PARAM_HEUR          TEXT("-h")
 
-//
-// COM1 Log handle
-//
-HANDLE g_hLoggingPort = INVALID_HANDLE_VALUE;
+#define DEFAULT_LOG_FILE    TEXT("rocall64.log")
 
-//
-// Verbose logging
-//
-BOOL g_bLogVerbose = FALSE;
+#define WELCOME_BANNER      "ReactOS x86 syscall fuzzer"
+#define VERSION_BANNER      "Version 2.0.0 from "__DATE__"\r\n"
+#define PSEUDO_GRAPHICS_BANNER \
+"  ____   ___   ____    _    _     _     \n"\
+" |  _ \\ / _ \\ / ___|  / \\  | |   | |    \n"\
+" | |_) | | | | |     / _ \\ | |   | |    \n"\
+" |  _ <| |_| | |___ / ___ \\| |___| |___ \n"\
+" |_| \\_\\\\___/ \\____/_/   \\_\\_____|_____|\n"\
+"     Y o u  s h a l l  n o t  p a s s         \n"
 
-//
+#define T_HELP "Usage:  [-win32k] [-log] [-pc Value] [-wt Value] [-sc Value] [-s] [-h] [-cr]\r\n\
+-log      - Enable logging to file last call parameters (warning: this will drop performance)\r\n\
+-o Value  - Output log destination (port name like COM1, COM2... or file name), default rocall64.log (-log required)\r\n\
+-win32k   - launch win32k service table fuzzing, default ntoskrnl service table fuzzing\r\n\
+-pc Value - number of passes for each service, default value 65536\r\n\
+-wt Value - wait timeout in seconds, default value 30\r\n\
+-sc Value - start fuzzing from service entry number(index from 0), default 0\r\n\
+-s        - restart program under LocalSystem account\r\n\
+-h        - enable heuristic parameter building for more targeted fuzzing\r\n"
+
 // Global flag indicating we are running under LocalSystem account
-//
-BOOLEAN g_IsLocalSystem = FALSE;
+BOOL g_IsLocalSystem = FALSE;
 
-//
 // Reactos real version global
-//
-REACTOS_VERSION g_rosVer;
+REACTOS_VERSION g_OsVersion;
 
-typedef struct _PRIVSET {
-    ULONG Privilege;
-    LPCSTR Name;
-} PRIVSET, *PPRIVSET;
+// Global variable used to track memory allocations for fuzzed data
+FUZZ_MEMORY_TRACKER g_MemoryTracker;
 
-PRIVSET g_privs[] = {
-    { SE_CREATE_TOKEN_PRIVILEGE, "SE_CREATE_TOKEN_PRIVILEGE" },
-    { SE_ASSIGNPRIMARYTOKEN_PRIVILEGE, "SE_ASSIGNPRIMARYTOKEN_PRIVILEGE" },
-    { SE_LOCK_MEMORY_PRIVILEGE, "SE_LOCK_MEMORY_PRIVILEGE" },
-    { SE_INCREASE_QUOTA_PRIVILEGE, "SE_INCREASE_QUOTA_PRIVILEGE" },
-    { SE_MACHINE_ACCOUNT_PRIVILEGE, "SE_MACHINE_ACCOUNT_PRIVILEGE" },
-    { SE_TCB_PRIVILEGE, "SE_TCB_PRIVILEGE" },
-    { SE_SECURITY_PRIVILEGE, "SE_SECURITY_PRIVILEGE" },
-    { SE_TAKE_OWNERSHIP_PRIVILEGE, "SE_TAKE_OWNERSHIP_PRIVILEGE" },
-    { SE_LOAD_DRIVER_PRIVILEGE, "SE_LOAD_DRIVER_PRIVILEGE"},
-    { SE_SYSTEM_PROFILE_PRIVILEGE, "SE_SYSTEM_PROFILE_PRIVILEGE"},
-    { SE_SYSTEMTIME_PRIVILEGE, "SE_SYSTEMTIME_PRIVILEGE"},
-    { SE_PROF_SINGLE_PROCESS_PRIVILEGE, "SE_PROF_SINGLE_PROCESS_PRIVILEGE" },
-    { SE_INC_BASE_PRIORITY_PRIVILEGE, "SE_INC_BASE_PRIORITY_PRIVILEGE" },
-    { SE_CREATE_PAGEFILE_PRIVILEGE, "SE_CREATE_PAGEFILE_PRIVILEGE" },
-    { SE_CREATE_PERMANENT_PRIVILEGE, "SE_CREATE_PERMANENT_PRIVILEGE" },
-    { SE_BACKUP_PRIVILEGE, "SE_BACKUP_PRIVILEGE" },
-    { SE_RESTORE_PRIVILEGE, "SE_RESTORE_PRIVILEGE" },
-    { SE_SHUTDOWN_PRIVILEGE, "SE_SHUTDOWN_PRIVILEGE" },
-    { SE_DEBUG_PRIVILEGE, "SE_DEBUG_PRIVILEGE" },
-    { SE_AUDIT_PRIVILEGE, "SE_AUDIT_PRIVILEGE" },
-    { SE_SYSTEM_ENVIRONMENT_PRIVILEGE, "SE_SYSTEM_ENVIRONMENT_PRIVILEGE" },
-    { SE_CHANGE_NOTIFY_PRIVILEGE, "SE_CHANGE_NOTIFY_PRIVILEGE" },
-    { SE_REMOTE_SHUTDOWN_PRIVILEGE, "SE_REMOTE_SHUTDOWN_PRIVILEGE" },
-    { SE_UNDOCK_PRIVILEGE, "SE_UNDOCK_PRIVILEGE" },
-    { SE_SYNC_AGENT_PRIVILEGE, "SE_SYNC_AGENT_PRIVILEGE" },
-    { SE_ENABLE_DELEGATION_PRIVILEGE, "SE_ENABLE_DELEGATION_PRIVILEGE" },
-    { SE_MANAGE_VOLUME_PRIVILEGE, "SE_MANAGE_VOLUME_PRIVILEGE" },
-    { SE_IMPERSONATE_PRIVILEGE, "SE_IMPERSONATE_PRIVILEGE" },
-    { SE_CREATE_GLOBAL_PRIVILEGE, "SE_CREATE_GLOBAL_PRIVILEGE" }
-};
+// Global fuzzing statistics
+FUZZ_STATS g_FuzzStats = { 0 };
 
-/*
-* FuzzLogCallName
-*
-* Purpose:
-*
-* Send syscall name to the log before it is not too late.
-*
-*/
-VOID FuzzLogCallName(
-    _In_ LPCSTR ServiceName
-)
-{
-    ULONG bytesIO;
-    CHAR szLog[128];
+// Global log support
+LOG_PARAMS g_Log;
 
-    if (g_hLoggingPort) {
-        WriteFile(g_hLoggingPort, (LPCVOID)ServiceName,
-            (DWORD)_strlen_a(ServiceName), &bytesIO, NULL);
-
-        _strcpy_a(szLog, "\r\n");
-        WriteFile(g_hLoggingPort, (LPCVOID)&szLog,
-            (DWORD)_strlen_a(szLog), &bytesIO, NULL);
-    }
-}
-
-/*
-* FuzzLogCallParameters
-*
-* Purpose:
-*
-* Send syscall parameters to the log before it is not too late.
-*
-*/
-VOID FuzzLogCallParameters(
-    _In_ ULONG ServiceId,
-    _In_ ULONG NumberOfArguments,
-    _In_ ULONG *Arguments
-)
-{
-    ULONG i;
-    DWORD bytesIO;
-    CHAR szLog[2048];
-
-    if (g_hLoggingPort == INVALID_HANDLE_VALUE)
-        return;
-
-    _strcpy_a(szLog, "[RoCall] ServiceId = ");
-    ultostr_a(ServiceId, _strend_a(szLog));
-    ultostr_a(NumberOfArguments, _strcat_a(szLog, " NumberOfArgs = "));
-    _strcat_a(szLog, " Arguments:");
-
-    for (i = 0; i < NumberOfArguments; i++) {
-        ultohex_a(Arguments[i], _strcat_a(szLog, " "));
-    }
-    _strcat_a(szLog, "\r\n");
-    WriteFile(g_hLoggingPort, (LPCVOID)&szLog,
-        (DWORD)_strlen_a(szLog), &bytesIO, NULL);
-}
+// Global blacklist
+BLACKLIST g_BlackList;
 
 /*
 * VehHandler
@@ -153,7 +79,7 @@ VOID FuzzLogCallParameters(
 *
 */
 LONG CALLBACK VehHandler(
-    EXCEPTION_POINTERS *ExceptionInfo
+    EXCEPTION_POINTERS* ExceptionInfo
 )
 {
     HMODULE hModule = GetModuleHandle(TEXT("kernel32.dll"));
@@ -161,346 +87,6 @@ LONG CALLBACK VehHandler(
         ExceptionInfo->ContextRecord->Eip = (DWORD)GetProcAddress(hModule, "ExitThread");
     }
     return EXCEPTION_CONTINUE_EXECUTION;
-}
-
-BLACKLIST g_NtOsBlackList;
-BLACKLIST g_W32kBlackList;
-
-#define DECLSPEC_NAKED __declspec(naked)
-
-#pragma warning(push)
-#pragma warning(disable:4100)
-
-/*
-* system_call_x86
-*
-* Purpose:
-*
-* Direct system call.
-*
-*/
-DECLSPEC_NAKED
-ULONG
-NTAPI
-system_call_x86(
-    ULONG ServiceID,
-    ULONG ArgsCount,
-    PULONG Args)
-{
-    __asm {
-        push ebx
-        push edi
-        push esi
-
-        mov esi, dword ptr[esp + 0x18] // Args
-        mov ebx, dword ptr[esp + 0x14] // ArgsCount
-        mov eax, dword ptr[esp + 0x10] // ServiceID
-
-        // load stack with args
-        mov ecx, ebx
-        lea ebx, dword ptr[ebx * 4]
-        sub esp, ebx
-        mov edi, esp
-        repne movsd
-        call syscall_stub
-
-        add esp, ebx
-
-        pop esi
-        pop edi
-        pop ebx
-        retn 0xc
-        int 3
-        int 3
-
-    syscall_stub:
-        mov edx, 0x07FFE0300 //UserSharedData->SystemCall
-        call dword ptr[edx]
-        retn
-    }
-}
-#pragma warning(pop)
-
-
-#include <intrin.h>
-
-/*
-* DoSystemCall
-*
-* Purpose:
-*
-* Run syscall with random parameters.
-*
-*/
-VOID DoSystemCall(
-    _In_ ULONG ServiceId,
-    _In_ ULONG NumberOfArguments
-)
-{
-    ULONG i;
-    ULONG64 u_rand;
-    ULONG Arguments[ARGUMENT_COUNT];
-
-    __try {
-
-        RtlSecureZeroMemory(Arguments, ARGUMENT_COUNT * sizeof(ULONG));
-
-        for (i = 0; i < NumberOfArguments; i++) {
-            u_rand = __rdtsc();
-            Arguments[i] = fuzzdata[u_rand % SIZEOF_FUZZDATA];
-        }
-
-        if (g_bLogVerbose)
-            FuzzLogCallParameters(ServiceId, NumberOfArguments, Arguments);
-
-        system_call_x86(
-            ServiceId,
-            NumberOfArguments,
-            (PULONG)&Arguments);
-
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        ;
-    }
-}
-
-/*
-* CallThread
-*
-* Purpose:
-*
-* Call service thread.
-*
-*/
-DWORD WINAPI CallThread(
-    _In_ LPVOID lpThreadParameter
-)
-{
-    ULONG currentPass;
-    ULONG serviceId;
-    ULONG numberOfArguments;
-    ULONG passCount;
-
-    CALL_PARAM *CallParam = (CALL_PARAM*)lpThreadParameter;
-
-    numberOfArguments = CallParam->NumberOfArguments;
-    serviceId = CallParam->ServiceId;
-    passCount = CallParam->PassCount;
-    currentPass = 0;
-
-    do {
-
-        DoSystemCall(serviceId, numberOfArguments);
-
-        currentPass++;
-
-    } while (currentPass < passCount);
-
-    ExitThread(0);
-}
-
-/*
-* PrintServiceInformation
-*
-* Purpose:
-*
-* Display service information.
-*
-*/
-void PrintServiceInformation(
-    _In_ ULONG NumberOfArguments,
-    _In_ ULONG ServiceId,
-    _In_ LPCSTR ServiceName)
-{
-    CHAR *pLog;
-    CHAR szConsoleText[4096];
-
-    _strcpy_a(szConsoleText, "\tArgs: 0x");
-    ultohex_a(NumberOfArguments, _strend_a(szConsoleText));
-
-    _strcat_a(szConsoleText, " Id 0x");
-    ultohex_a(ServiceId, _strend_a(szConsoleText));
-    pLog = _strcat_a(szConsoleText, "\tName:");
-    _strncpy_a(pLog, MAX_PATH, ServiceName, MAX_PATH);
-    _strcat_a(szConsoleText, "\r\n");
-
-    OutputConsoleMessage(szConsoleText);
-}
-
-/*
-* FuzzRun
-*
-* Purpose:
-*
-* Perform reactos syscall table fuzzing.
-*
-*/
-void FuzzRun(
-    _In_ CONST SYSCALL_ENTRY *ServiceTable,
-    _In_ BLACKLIST *BlackList,
-    _In_ ULONG MinSyscallNumber,
-    _In_ ULONG MaxSyscallNumber,
-    _In_ ULONG WaitTimeout,
-    _In_ ULONG PassCount,
-    _In_ BOOL IsWin32k
-)
-{
-    BOOLEAN bWasEnabled;
-    CHAR* ServiceName;
-    ULONG i, ServiceIndex;
-    ULONG NumberOfArguments;
-
-    DWORD dwThreadId;
-
-    HANDLE hThread = NULL;
-
-    CALL_PARAM CalleParam;
-
-    CHAR szConsoleText[400];
-
-    OutputConsoleMessage("[+] Entering FuzzRun()\r\n\n");
-
-    //
-    // Assign much possible privileges if can.
-    //
-    for (i = 0; i < RTL_NUMBER_OF(g_privs); i++) {
-        _strcpy_a(szConsoleText, "[*] Privilege ");
-        _strcat_a(szConsoleText, g_privs[i].Name);
-
-        if (NT_SUCCESS(RtlAdjustPrivilege(g_privs[i].Privilege, TRUE, FALSE, &bWasEnabled))) {
-            _strcat_a(szConsoleText, " adjusted\r\n");
-        }
-        else {
-            _strcat_a(szConsoleText, " not adjusted\r\n");
-        }
-        OutputConsoleMessage(szConsoleText);
-    }
-
-    //
-    // Iterate through services and call them with predefined bad arguments.
-    //
-    for (ServiceIndex = MinSyscallNumber;
-        ServiceIndex < MaxSyscallNumber; ServiceIndex++)
-    {
-        szConsoleText[0] = 0;
-        ultostr_a(ServiceIndex, szConsoleText);
-        SetConsoleTitleA(szConsoleText);
-
-        //
-        // Show generic syscall info.
-        //
-        ServiceName = (CHAR*)ServiceTable[ServiceIndex].Name;
-
-        //
-        // Log name.
-        //
-        FuzzLogCallName(ServiceName);
-
-        NumberOfArguments = ServiceTable[ServiceIndex].NumberOfArguments;
-
-        PrintServiceInformation(NumberOfArguments,
-            ServiceIndex,
-            ServiceName);
-
-        //
-        // Check if syscall blacklisted and skip it is.
-        //
-        if (BlackListEntryPresent(BlackList, (LPCSTR)ServiceName)) {
-            OutputConsoleMessage("\t\t\t^^^^^ Service found in blacklist, skip\n\r");
-            continue;
-        }
-
-        //
-        // Create caller thread and do syscall in it.
-        //
-        CalleParam.NumberOfArguments = NumberOfArguments;
-        CalleParam.ServiceId = ServiceIndex;
-        CalleParam.PassCount = PassCount;
-
-        if (IsWin32k) {
-            CalleParam.ServiceId += W32K_SYSCALL_ADJUST;
-        }
-
-        hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CallThread,
-            (LPVOID)&CalleParam, 0, &dwThreadId);
-
-        if (hThread) {
-            if (WaitForSingleObject(hThread, WaitTimeout * 1000) == WAIT_TIMEOUT) {
-                _strcpy_a(szConsoleText, "Timeout reached for callproc of Service: ");
-                ultostr_a(CalleParam.ServiceId, _strend_a(szConsoleText));
-                _strcat_a(szConsoleText, "\r\n");
-                OutputConsoleMessage(szConsoleText);
-                TerminateThread(hThread, (DWORD)-1);
-            }
-            CloseHandle(hThread);
-        }
-    }
-
-    OutputConsoleMessage("\r\n[!] Service table probing complete.\n\r");
-    OutputConsoleMessage("[-] Leaving FuzzRun()\r\n");
-}
-
-/*
-* FuzzOpenLog
-*
-* Purpose:
-*
-* Open COM1 port for logging.
-*
-*/
-BOOLEAN FuzzOpenLog(
-    VOID
-)
-{
-    HANDLE	hFile;
-    CHAR	szWelcome[128];
-    DWORD	bytesIO;
-
-    hFile = CreateFile(TEXT("COM1"),
-        GENERIC_ALL | SYNCHRONIZE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL,
-        OPEN_EXISTING,
-        FILE_FLAG_WRITE_THROUGH,
-        NULL);
-
-    if (hFile != INVALID_HANDLE_VALUE) {
-
-        _strcpy_a(szWelcome, "\r\n[RoCall] Logging start.\r\n");
-        WriteFile(hFile, (LPCVOID)&szWelcome,
-            (DWORD)_strlen_a(szWelcome), &bytesIO, NULL);
-
-        g_hLoggingPort = hFile;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-/*
-* FuzzCloseLog
-*
-* Purpose:
-*
-* Close COM1 port.
-*
-*/
-VOID FuzzCloseLog(
-    VOID
-)
-{
-    CHAR	szBye[128];
-    DWORD	bytesIO;
-
-    if (g_hLoggingPort == INVALID_HANDLE_VALUE)
-        return;
-
-    _strcpy_a(szBye, "\r\n[RoCall] Log stop.\r\n");
-    WriteFile(g_hLoggingPort,
-        (LPCVOID)&szBye, (DWORD)_strlen_a(szBye), &bytesIO, NULL);
-
-    CloseHandle(g_hLoggingPort);
-    g_hLoggingPort = INVALID_HANDLE_VALUE;
 }
 
 /*
@@ -511,336 +97,262 @@ VOID FuzzCloseLog(
 * Prepare and start probing.
 *
 */
-VOID FuzzInit(
-    _In_ ROCALL_PARAMS *SessionParams
+UINT FuzzInit(
+    _In_ PFUZZ_PARAMS FuzzParams
 )
 {
-    BOOLEAN LogEnabled = FALSE, CheckedBuild = FALSE;
-    BLACKLIST *BlackList;
-
-    CONST SYSCALL_ENTRY *ServiceTable;
-
+    UINT result = 0;
+    BOOL LogEnabled = FALSE, CheckedBuild = FALSE;
+    LPSTR cmdLine;
     HMODULE hUser32 = NULL;
+    CHAR szOut[MAX_PATH];
+    CHAR szCurrentDir[MAX_PATH + 1];
 
-    ULONG MinSyscallNumber, MaxSyscallNumber;
-
-    CHAR szOut[400];
-
-    OutputConsoleMessage("[+] Entering FuzzInit()\r\n");
+    ConsoleShowMessage("[+] Entering FuzzInit()", TEXT_COLOR_CYAN);
 
     if (g_IsLocalSystem)
-        OutputConsoleMessage("[+] LocalSystem account\r\n");
+        ConsoleShowMessage("[+] LocalSystem account", TEXT_COLOR_CYAN);
 
-    if (IsRCHDrvLoaded())
-        OutputConsoleMessage("[+] RCHDRV is loaded\r\n");
-    else
-        OutputConsoleMessage("[+] RCHDRV is not loaded\r\n");
-
-    CheckedBuild = IsCheckedBuild();
+    CheckedBuild = supIsCheckedBuild();
     if (CheckedBuild) {
 #ifndef _USE_CHECKED_TABLE
-        if (SessionParams->ProbeWin32k) {
-            OutputConsoleMessage("[!] ReactOS build type is Checked and win32k table probe selected!\r\n");
-            OutputConsoleMessage("[!] Use ROCALL for Checked builds, aborting.\r\n");
-            goto Done;
+        if (FuzzParams->ProbeWin32k) {
+            ConsoleShowMessage("[!] ReactOS build type is Checked and win32k table probe selected!", TEXT_COLOR_YELLOW);
+            ConsoleShowMessage("[!] Use ROCALL for Checked builds, aborting", TEXT_COLOR_YELLOW);
+            return (UINT)-3;
         }
 #endif
     }
 
-    //
-    // Show current directory.
-    //
-    RtlSecureZeroMemory(szOut, sizeof(szOut));
-    _strcpy_a(szOut, "[+] Current directory: ");
-    GetCurrentDirectoryA(MAX_PATH, _strend_a(szOut));
-    _strcat_a(szOut, "\r\n");
-    OutputConsoleMessage(szOut);
-
-    //
-    // Show command line.
-    //
-    OutputConsoleMessage("[+] Command line -> \r\n\r\n");
-    OutputConsoleMessage(GetCommandLineA());
-    OutputConsoleMessage("\r\n\r\n");
-
-    RtlSecureZeroMemory(&g_rosVer, sizeof(REACTOS_VERSION));
-
-    //
     // Show version logo if possible.
-    //
-    if (GetReactOSVersion(&g_rosVer.Major,
-        &g_rosVer.Minor,
-        &g_rosVer.Build,
-        &g_rosVer.Revision))
-    {
-        _strcpy_a(szOut, "[~] ReactOS version: ");
-        ultostr_a(g_rosVer.Major, _strend_a(szOut));
-        ultostr_a(g_rosVer.Minor, _strcat_a(szOut, "."));
-        ultostr_a(g_rosVer.Build, _strcat_a(szOut, "."));
-        ultostr_a(g_rosVer.Revision, _strcat_a(szOut, "."));
-        _strcat_a(szOut, "\r\n");
-        OutputConsoleMessage(szOut);
+    if (supGetReactOSVersion(&g_OsVersion)) {
+        StringCchPrintfA(szOut, sizeof(szOut), "[+] Reactos version: %lu.%lu.%lu",
+            g_OsVersion.Major,
+            g_OsVersion.Minor,
+            g_OsVersion.Build);
+        ConsoleShowMessage(szOut, TEXT_COLOR_CYAN);
     }
 
-    g_bLogVerbose = SessionParams->VerboseLog;
+    cmdLine = GetCommandLineA();
+    GetCurrentDirectoryA(MAX_PATH, szCurrentDir);
+    StringCchPrintfA(szOut, sizeof(szOut), "[~] Base configuration\nCurrent directory: %s\nCommand line: %s\n"\
+        "Pass count: %lu per each syscall\n"\
+        "Thread timeout: %lu sec\nParam heuristics: %s",
+        szCurrentDir,
+        cmdLine,
+        FuzzParams->PassCount,
+        FuzzParams->WaitTimeout,
+        FuzzParams->EnableParamsHeuristic ? "Enabled" : "Disabled");
 
-    _strcpy_a(szOut, "[+] Number of passes for each syscall = ");
-    ultostr_a(SessionParams->PassCount, _strend_a(szOut));
-    _strcat_a(szOut, "\r\n");
-    OutputConsoleMessage(szOut);
+    ConsoleShowMessage(szOut, 0);
 
-    _strcpy_a(szOut, "[+] Wait timeout for each syscall (seconds) = ");
-    ultostr_a(SessionParams->WaitTimeout, _strend_a(szOut));
-    _strcat_a(szOut, "\r\n");
-    OutputConsoleMessage(szOut);
+    if (FuzzParams->LogEnabled) {
 
-    if (SessionParams->EnableLog) {
+        g_Log.LogHandle = INVALID_HANDLE_VALUE;
+        g_Log.LogToFile = FuzzParams->LogToFile;
 
-        _strcpy_a(szOut, "[+] Logging type ");
-        if (g_bLogVerbose)
-            _strcat_a(szOut, "verbose, include parameters\r\n");
-        else
-            _strcat_a(szOut, " default, only syscall names\r\n");
-
-        OutputConsoleMessage(szOut);
-
-        LogEnabled = FuzzOpenLog();
+        LogEnabled = FuzzOpenLog(FuzzParams->szLogDeviceOrFile, &g_Log);
         if (!LogEnabled) {
-            OutputConsoleMessage("[!] Cannot open COM port for logging, logging disabled\r\n");
-            g_bLogVerbose = FALSE;
+            StringCchPrintfA(szOut, sizeof(szOut), "[!] Log open error, GetLastError() = %lu, log will be disabled", GetLastError());
+            ConsoleShowMessage(szOut, TEXT_COLOR_RED);
         }
-        else
-            OutputConsoleMessage("[+] Logging enabled\r\n");
+        else {
+            _strcpy_a(szOut, "[+] Logging is enabled, output will be written to ");
+            WideCharToMultiByte(CP_ACP, 0, FuzzParams->szLogDeviceOrFile, -1,
+                _strend_a(szOut), MAX_PATH, NULL, NULL);
+            ConsoleShowMessage(szOut, TEXT_COLOR_CYAN);
+        }
     }
 
-    if (SessionParams->ProbeWin32k) {
-        OutputConsoleMessage("[*] Probing win32k table.\r\n");
+    ConsoleShowMessage(FuzzParams->ProbeWin32k ? "[*] Win32k table probe mode" : "[*] Ntoskrnl table probe mode", TEXT_COLOR_CYAN);
 
+    if (BlackListCreateFromFile(&g_BlackList, CFG_FILE, FuzzParams->ProbeWin32k ? (LPCSTR)"win32k" : (LPCSTR)"ntos")) {
+        StringCchPrintfA(szOut, sizeof(szOut), "[+] Blacklist created with %lu entries", g_BlackList.NumberOfEntries);
+        ConsoleShowMessage(szOut, TEXT_COLOR_CYAN);
+    }
+
+    if (FuzzParams->ProbeWin32k) {
 #ifdef _USE_CHECKED_TABLE
-        OutputConsoleMessage("[+] Checked build tables will be used\r\n");
+        ConsoleShowMessage("[+] Checked build tables will be used", TEXT_COLOR_CYAN);
 #else
-        OutputConsoleMessage("[+] Release build tables will be used\r\n");
+        ConsoleShowMessage("[+] Release build tables will be used", TEXT_COLOR_CYAN);
 #endif
-
-        Sleep(1000);
-
-        //
         // Reference user32.
-        //
         hUser32 = LoadLibrary(TEXT("user32.dll"));
-
-        RtlSecureZeroMemory(&g_W32kBlackList, sizeof(g_W32kBlackList));
-        BlackListCreateFromFile(&g_W32kBlackList, (LPCSTR)CFG_FILE, (LPCSTR)"win32k");
-
-        ServiceTable = W32pServiceTable;
-
-        MaxSyscallNumber = W32pServiceLimit;
-
-        BlackList = &g_W32kBlackList;
     }
-    else {
-        OutputConsoleMessage("[*] Probing ntoskrnl table.\r\n");
+
+    ConsoleShowMessage("[+] Waiting 5 sec to go", TEXT_COLOR_CYAN);
+#ifndef _DEBUG
+    for (ULONG countdown = 5; countdown > 0; countdown--) {
+        StringCchPrintfA(szOut, sizeof(szOut), "[+] Starting in %lu...", countdown);
+        ConsoleShowMessage(szOut, TEXT_COLOR_CYAN);
         Sleep(1000);
-
-        RtlSecureZeroMemory(&g_NtOsBlackList, sizeof(g_NtOsBlackList));
-        BlackListCreateFromFile(&g_NtOsBlackList, (LPCSTR)CFG_FILE, (LPCSTR)"ntos");
-
-        ServiceTable = KiServiceTable;
-
-        MaxSyscallNumber = KiServiceLimit;
-
-        BlackList = &g_NtOsBlackList;
     }
+#endif
+    result = FuzzRun(&g_BlackList, FuzzParams);
 
-    //
-    // Show limit value.
-    //
-    _strcpy_a(szOut, "[+] Syscall limit = ");
-    ultostr_a(MaxSyscallNumber, _strend_a(szOut));
-    _strcat_a(szOut, "\r\n");
-    OutputConsoleMessage(szOut);
-
-    //
-    // Set starting syscall index.
-    //
-    szOut[0] = 0;
-
-    if (SessionParams->SyscallStartFrom >= MaxSyscallNumber) {
-        MinSyscallNumber = SYSCALL_ENTRY_FIRST;
-        _strcpy_a(szOut, "[!] Invalid syscall start index specified, defaulted to 0\r\n");
-    }
-    else {
-        MinSyscallNumber = SessionParams->SyscallStartFrom;
-        _strcpy_a(szOut, "[+] Syscall start index = ");
-        ultostr_a(MinSyscallNumber, _strend_a(szOut));
-        _strcat_a(szOut, "\r\n");
-    }
-    OutputConsoleMessage(szOut);
-
-    OutputConsoleMessage("[+] Waiting 5 sec to go\r\n");
-
-    Sleep(5000);
-
-    FuzzRun(ServiceTable,
-        BlackList,
-        MinSyscallNumber,
-        MaxSyscallNumber,
-        SessionParams->WaitTimeout,
-        SessionParams->PassCount,
-        SessionParams->ProbeWin32k);
-
-    BlackListDestroy(BlackList);
+    BlackListDestroy(&g_BlackList);
 
     if (LogEnabled) {
-        OutputConsoleMessage("[+] Logging stop\r\n");
-        FuzzCloseLog();
+        ConsoleShowMessage("[-] Logging stop", TEXT_COLOR_CYAN);
+        FuzzCloseLog(&g_Log);
     }
 
     if (hUser32)
         FreeLibrary(hUser32);
 
-    SessionParamsRemove();
+    supSessionParamsRemove();
 
-Done:
-    OutputConsoleMessage("[-] Leaving FuzzInit()\r\n");
+    ConsoleShowMessage("[-] Leaving FuzzInit()", TEXT_COLOR_CYAN);
+    return result;
 }
 
-#define T_USAGE "ROCALL - ReactOS syscall fuzzer\r\nUsage:  [-win32k] [-logn | -logv] [-pc Value] [-wt Value] [-sc Value] [-s]\r\n\
-\r\n-logn - enable logging via COM1 port, service name will be logged, default disabled;\r\n\
--logv - enable logging via COM1 port, service name and call parameters will be logged(slow), default disabled;\r\n\
--win32k - launch win32k service table fuzzing, default ntoskrnl service table fuzzing;\r\n\
--pc Value - number of passes for each service, default value 1024;\r\n\
--wt Value - wait timeout in seconds, default value 30;\r\n\
--sc Value - start fuzzing from service entry number(index from 0), default 0;\r\n\
--s - restart program under LocalSystem account.\r\n"
-
 /*
-* main
+* RocallMain
 *
 * Purpose:
 *
 * Program main, process command line options.
 *
 */
-void main()
+UINT RocallMain()
 {
-    PVOID   ExceptionHandler;
-    TCHAR   text[64];
+    UINT result = 0;
+    ULONG rLen;
+    PVOID exceptionHandler;
 
-    ROCALL_PARAMS SessionParams;
+    FUZZ_PARAMS fuzzParams;
+    LPWSTR commandLine = GetCommandLine();
 
-    if (IsReactOS()) {
-        OutputConsoleMessage("[*] Hello ReactOS world!\r\n");
-    }
-    else {
-        OutputConsoleMessage("This program requires ReactOS.\r\n");
+    WCHAR szTextBuf[MAX_PATH + 1];
+
+    if (!ConsoleInit())
+        return (UINT)-1;
+
+    ConsoleShowMessage(PSEUDO_GRAPHICS_BANNER, TEXT_COLOR_CYAN);
+    ConsoleShowMessage(WELCOME_BANNER, TEXT_COLOR_CYAN);
+    ConsoleShowMessage(VERSION_BANNER, TEXT_COLOR_CYAN);
+
+    if (!supIsReactOS()) {
+        ConsoleShowMessage("This program requires ReactOS", TEXT_COLOR_YELLOW);
 #ifndef _DEBUG
-        ExitProcess(0);
+        ExitProcess((UINT)-2);
 #endif
     }
 
-    //
-    // Default ROCALL params.
-    //
-    RtlSecureZeroMemory(&SessionParams, sizeof(SessionParams));
-    SessionParams.PassCount = FUZZ_PASS_COUNT;
-    SessionParams.WaitTimeout = DEFAULT_WAIT_TIMEOUT;
+    // Default ROCALL params
+    RtlSecureZeroMemory(&fuzzParams, sizeof(fuzzParams));
+    fuzzParams.PassCount = FUZZ_PASS_COUNT;
+    fuzzParams.WaitTimeout = FUZZ_THREAD_TIMEOUT_SEC;
 
-    g_IsLocalSystem = IsLocalSystem();
+    g_IsLocalSystem = supIsLocalSystem();
     if (g_IsLocalSystem) {
-        SessionParamsManage(FALSE, &SessionParams);
+        supSessionParamsManage(FALSE, &fuzzParams);
     }
     else {
 
-        //
-        // Parse command line.
-        //
-        // Possible switches:
-        //  
-        //    ROCALL [-win32k] [-logn | -logv] [-pc Value] [-sc Value] [-wt Value] [-s]
-        //
-        if (GetCommandLineOption(TEXT("-help"), FALSE, NULL, 0)) {
-            OutputConsoleMessage(T_USAGE);
+        if (supGetParamOption(commandLine, PARAM_HELP, FALSE, NULL, 0, NULL)) {
+            ConsoleShowMessage(T_HELP, 0);
             ExitProcess(0);
         }
 
-        //
-        // Setup session parameters structure.
-        //
-
-        //
         // win32k switch state.
-        //
-        SessionParams.ProbeWin32k = GetCommandLineOption(TEXT("-win32k"), FALSE, NULL, 0);
-        if (SessionParams.ProbeWin32k)
-            SessionParams.ProbeWin32kOption = TRUE;
+        fuzzParams.ProbeWin32k = supGetParamOption(commandLine, PARAM_WIN32K, FALSE, NULL, 0, NULL);
 
-        //
-        // logn switch state.
-        //
-        SessionParams.EnableLog = GetCommandLineOption(TEXT("-logn"), FALSE, NULL, 0);
-        if (SessionParams.EnableLog)
-            SessionParams.EnableLogOption = TRUE;
+        // log switch state.
+        fuzzParams.LogEnabled = supGetParamOption(commandLine, PARAM_LOG, FALSE, NULL, 0, NULL);
+        if (fuzzParams.LogEnabled) {
+            rLen = 0;
+            RtlSecureZeroMemory(szTextBuf, sizeof(szTextBuf));
+            if (supGetParamOption(commandLine,
+                PARAM_OUTPUT,
+                TRUE,
+                szTextBuf,
+                RTL_NUMBER_OF(szTextBuf),
+                &rLen) && rLen)
+            {
+                _strcpy(fuzzParams.szLogDeviceOrFile, szTextBuf);
+            }
+            else {
+                _strcpy(fuzzParams.szLogDeviceOrFile, DEFAULT_LOG_FILE);
+            }
 
-        //
-        // logv switch case.
-        //
-        SessionParams.VerboseLog = GetCommandLineOption(TEXT("-logv"), FALSE, NULL, 0);
-        if (SessionParams.VerboseLog) {
-            SessionParams.VerboseLogOption = TRUE;
-            SessionParams.EnableLog = TRUE;
+            if (supIsComPort(fuzzParams.szLogDeviceOrFile)) {
+                fuzzParams.LogToFile = FALSE;
+            }
+            else {
+                fuzzParams.LogToFile = TRUE;
+            }
         }
 
-        //
-        // pc parametric switch case.
-        //
-        RtlSecureZeroMemory(text, sizeof(text));
-        if (GetCommandLineOption(TEXT("-pc"),
+        // -pc (PassCount) param.
+        rLen = 0;
+        RtlSecureZeroMemory(szTextBuf, sizeof(szTextBuf));
+        if (supGetParamOption(commandLine,
+            PARAM_PASSCOUNT,
             TRUE,
-            text, sizeof(text) / sizeof(TCHAR)))
+            szTextBuf,
+            RTL_NUMBER_OF(szTextBuf),
+            &rLen) && rLen)
         {
-            SessionParams.PassCountOption = TRUE;
-            SessionParams.PassCount = strtoul(text);
-            if (SessionParams.PassCount == 0)
-                SessionParams.PassCount = FUZZ_PASS_COUNT;
+            fuzzParams.PassCount = _strtoul(szTextBuf);
         }
 
-        //
-        // sc parametric switch case.
-        //
-        RtlSecureZeroMemory(text, sizeof(text));
-        if (GetCommandLineOption(TEXT("-sc"),
+        if (fuzzParams.PassCount == 0)
+            fuzzParams.PassCount = FUZZ_PASS_COUNT;
+
+        // -sc (Start from)
+        rLen = 0;
+        RtlSecureZeroMemory(szTextBuf, sizeof(szTextBuf));
+        if (supGetParamOption(commandLine,
+            PARAM_SYSCALL_START,
             TRUE,
-            text, sizeof(text) / sizeof(TCHAR)))
+            szTextBuf,
+            RTL_NUMBER_OF(szTextBuf),
+            &rLen) && rLen)
         {
-            SessionParams.SyscallStartFromOption = TRUE;
-            SessionParams.SyscallStartFrom = strtoul(text);
+            fuzzParams.SyscallStartFrom = _strtoul(szTextBuf);
+            fuzzParams.ProbeFromSyscallId = TRUE;
+            if (fuzzParams.SyscallStartFrom >= W32SYSCALLSTART)
+                fuzzParams.ProbeWin32k = TRUE; // Force flag
         }
 
-        //
-        // wt parametric switch case.
-        //
-        RtlSecureZeroMemory(text, sizeof(text));
-        if (GetCommandLineOption(TEXT("-wt"),
+        // -wt (WaitTimeout) param.
+        RtlSecureZeroMemory(szTextBuf, sizeof(szTextBuf));
+        if (supGetParamOption(commandLine,
+            PARAM_WAITTIMEOUT,
             TRUE,
-            text, sizeof(text) / sizeof(TCHAR)))
+            szTextBuf,
+            RTL_NUMBER_OF(szTextBuf),
+            &rLen) && rLen)
         {
-            SessionParams.WaitTimeoutOption = TRUE;
-            SessionParams.WaitTimeout = strtoul(text);
-            if (SessionParams.WaitTimeout == 0)
-                SessionParams.WaitTimeout = DEFAULT_WAIT_TIMEOUT;
+            fuzzParams.WaitTimeout = _strtoul(szTextBuf);
+        }
+
+        if (fuzzParams.WaitTimeout == 0)
+            fuzzParams.WaitTimeout = FUZZ_THREAD_TIMEOUT_SEC;
+
+        // -h (Heuristics) param.
+        if (supGetParamOption(commandLine, PARAM_HEUR, FALSE, NULL, 0, NULL)) {
+            fuzzParams.EnableParamsHeuristic = TRUE;
         }
     }
 
-    TryRunAsService(g_IsLocalSystem, &SessionParams);
+    supTryRunAsService(g_IsLocalSystem, &fuzzParams);
 
-    ExceptionHandler = AddVectoredExceptionHandler(1, &VehHandler);
-    if (ExceptionHandler) {
-
-        FuzzInit(&SessionParams);
-
-        RemoveVectoredExceptionHandler(ExceptionHandler);
+    exceptionHandler = AddVectoredExceptionHandler(1, &VehHandler);
+    if (exceptionHandler) {
+        result = FuzzInit(&fuzzParams);
+        RemoveVectoredExceptionHandler(exceptionHandler);
     }
 
-    ExitProcess(0);
+    ExitProcess(result);
+}
+
+
+void main()
+{
+    //SyscallDBGen();
+    //OutputSortedWin32kSyscalls();
+    ExitProcess(RocallMain());
 }

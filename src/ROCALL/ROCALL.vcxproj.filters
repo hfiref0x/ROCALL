@@ -16,6 +16,15 @@
     <Filter Include="minirtl">
       <UniqueIdentifier>{cebbea95-4508-453d-a172-e8b16a083f4d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Log">
+      <UniqueIdentifier>{3d9ce296-b247-4995-a2ac-8fcb42162da4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blacklist">
+      <UniqueIdentifier>{d220a2cb-87c1-47fa-9aa8-ad89b3a76bc6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Fuzz">
+      <UniqueIdentifier>{1d5eedda-373e-49c4-9900-36ee0aea5f82}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -36,7 +45,7 @@
     <ClCompile Include="minirtl\ultohex.c">
       <Filter>minirtl</Filter>
     </ClCompile>
-    <ClCompile Include="util.c">
+    <ClCompile Include="sup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="minirtl\_filename.c">
@@ -63,6 +72,24 @@
     <ClCompile Include="minirtl\_strstri.c">
       <Filter>minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="log.c">
+      <Filter>Log</Filter>
+    </ClCompile>
+    <ClCompile Include="blacklist.c">
+      <Filter>Blacklist</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strstr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="fuzz_param.c">
+      <Filter>Fuzz</Filter>
+    </ClCompile>
+    <ClCompile Include="safestr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fuzz.c">
+      <Filter>Fuzz</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="minirtl\minirtl.h">
@@ -74,19 +101,31 @@
     <ClInclude Include="global.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="util.h">
+    <ClInclude Include="sup.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="fuzz.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="roos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="syscall.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="log.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="blacklist.h">
+      <Filter>Blacklist</Filter>
+    </ClInclude>
+    <ClInclude Include="fuzz_data.h">
+      <Filter>Fuzz</Filter>
+    </ClInclude>
+    <ClInclude Include="fuzz.h">
+      <Filter>Fuzz</Filter>
+    </ClInclude>
+    <ClInclude Include="safestr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

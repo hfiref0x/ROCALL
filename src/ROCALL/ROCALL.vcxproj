@@ -24,13 +24,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -38,7 +38,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseForChecked|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -59,12 +59,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
+    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
+    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
     <CodeAnalysisRuleSet>NativeMinimumRules.ruleset</CodeAnalysisRuleSet>
@@ -72,7 +72,7 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseForChecked|Win32'">
-    <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
+    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
     <CodeAnalysisRuleSet>NativeMinimumRules.ruleset</CodeAnalysisRuleSet>
@@ -147,6 +147,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="blacklist.c" />
+    <ClCompile Include="fuzz.c" />
+    <ClCompile Include="fuzz_param.c" />
+    <ClCompile Include="log.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="minirtl\cmdline.c" />
     <ClCompile Include="minirtl\strtoul.c" />
@@ -160,18 +164,24 @@
     <ClCompile Include="minirtl\_strend.c" />
     <ClCompile Include="minirtl\_strlen.c" />
     <ClCompile Include="minirtl\_strncpy.c" />
+    <ClCompile Include="minirtl\_strstr.c" />
     <ClCompile Include="minirtl\_strstri.c" />
-    <ClCompile Include="util.c" />
+    <ClCompile Include="safestr.c" />
+    <ClCompile Include="sup.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="blacklist.h" />
     <ClInclude Include="fuzz.h" />
+    <ClInclude Include="fuzz_data.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="log.h" />
+    <ClInclude Include="safestr.h" />
     <ClInclude Include="syscall.h" />
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="minirtl\rtltypes.h" />
     <ClInclude Include="roos.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="util.h" />
+    <ClInclude Include="sup.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resource.rc" />
